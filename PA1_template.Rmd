@@ -1,25 +1,110 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
+title: 'Reproducible Research: Peer Assessment 1'
+output:
   html_document:
-    keep_md: true
+    keep_md: yes
+    toc: yes
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(plyr)
+```
 
-## Loading and preprocessing the data
+```{r Loading and preprocessing the data}
+# Set dir
+setwd("/home/carlos/coursera/R/Reproducible_Research/week02/")
 
+# Download file and unzip
+#temp <- tempfile()
+#download.file("https://github.com/ceggithub/RepData_PeerAssessment1/raw/master/activity.zip", temp)
+#unzip(temp)
+#unlink(temp)
 
+# Load data
+activity <- read.csv2(file = "activity.csv", header = TRUE, sep = ',', na.strings = "NA" )
+activity$date <- strptime(activity$date, format = "%Y-%m-%d")
+
+# Sum, Mean and Median steps by day
+byday <- ddply(activity,~date,summarise,sum=sum(steps), mean=mean(steps, na.rm = TRUE), median=median(steps, na.rm = TRUE))
+
+# Mean and Median steps by time series
+byfiveminutes <- ddply(activity, ~interval, summarise, mean=mean(steps, na.rm = TRUE), median=median(steps, na.rm = TRUE))
+
+```
 
 ## What is mean total number of steps taken per day?
+```{r, echo=FALSE}
+# Steps frequency by 5-minutes
+hist(byday$sum, xlab = "Total Steps by day", main = "Frequency Steps", col = "red")
+```
 
+### Results by day
+```{r, echo=FALSE}
+byday
+```
 
 
 ## What is the average daily activity pattern?
+```{r, include=FALSE}
+# Maximum average by 5-minutes
+maximo <- byfiveminutes[byfiveminutes$mean==max(byfiveminutes$mean),c('interval')]
+```
+Average maximum occurs within: `r maximo`
+
+```{r, echo=FALSE}
+plot(byfiveminutes$interval, byfiveminutes$mean, col="red", type = "b", main = "Mean steps by 5-minute", ylab = "Steps", xlab = "Minute")
+
+```
 
 
 
 ## Imputing missing values
 
+Missing are `r sum(is.na(activity$steps))` rows
+
+This missing data will are filled by median of the 5-minute period.
+
+
+### The new data look
+
+```{r, echo=FALSE}
+# Create new data frame and fill missing steps with median
+activityfilled <- activity
+activityfilled <- within(activity, steps <- ifelse(is.na(steps), byfiveminutes$median, steps))
+
+# Re-make by day
+bydayfilled <- ddply(activityfilled,~date,summarise,sum=sum(steps),mean=mean(steps, na.rm = TRUE), median=median(steps, na.rm = TRUE))
+
+# Re-make by 5-minutes
+byfiveminutesfilled <- ddply(activityfilled, ~interval, summarise, mean=mean(steps, na.rm = TRUE), median=median(steps, na.rm = TRUE))
+
+# Plot results
+hist(bydayfilled$sum, xlab = "Total Steps by day", main = "Frequency Steps filled", col = "red")
+```
+
+Results by day with missed filled
+
+How to fill the average of the values it was high
+
+```{r, echo=FALSE}
+bydayfilled
+```
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=FALSE}
+# Create new var: dayweek
+activity <- within(activity, dayweek <- as.factor(ifelse((weekdays(date) == "Saturday" | weekdays(date) == "Sunday"), "Weekend", "Weekday")))
+
+# Re-make by dayweek
+byfiveminutesweekends <- ddply(activity[activity$dayweek=="Weekend", ],~interval,summarise,mean=mean(steps, na.rm = TRUE))
+byfiveminutesweekdays <- ddply(activity[activity$dayweek=="Weekday", ],~interval,summarise,mean=mean(steps, na.rm = TRUE))
+
+# Plot graphs
+par(mfrow=c(2,1))
+plot(byfiveminutesweekdays$interval, byfiveminutesweekdays$mean, col="red", type = "l", main = "Weekday Steps by 5-minute", ylab = "Steps", xlab = "", ylim = range(byfiveminutesweekdays$mean))
+plot(byfiveminutesweekends$interval, byfiveminutesweekends$mean, col="blue", type = "l", main = "Weekend Steps by 5-minute", ylab = "Steps", xlab = "", ylim = range(byfiveminutesweekdays$mean))
+
+```
+
